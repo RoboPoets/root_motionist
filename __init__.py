@@ -18,55 +18,46 @@ class CreateRootMotion(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        skel = active_armature(context)
-        if skel == None:
+        act_skel = active_armature(context)
+        ref_skel = reference_armature(context)
+        if act_skel == None or ref_skel == None:
             return {'CANCELLED'}
 
-        hip = skel.pose.bones['pelvis']
-        root = skel.pose.bones['root']
-        if hip == None or root == None:
+        act_hip = act_skel.pose.bones['pelvis']
+        ref_hip = ref_skel.pose.bones['pelvis']
+        if act_hip == None or ref_hip == None:
             return {'CANCELLED'}
 
-        act = skel.animation_data.action
-        if act == None:
+        anim = act_skel.animation_data.action
+        ref_anim = ref_skel.animation_data.action
+        if anim == None or ref_anim == None:
             return {'CANCELLED'}
 
-        context.scene.objects.active = skel
         bpy.ops.object.mode_set(mode='POSE')
-        context.scene.frame_set(act.frame_range.x)
-
-        prev_mat = world_mat(skel, hip)
-
-        for f in range(round(act.frame_range.x) + 1, round(act.frame_range.y) + 1):
+        for f in range(round(anim.frame_range.x), round(anim.frame_range.y) + 1):
             context.scene.frame_set(f)
-            hmat = world_mat(skel, hip)
-            rmat = world_mat(skel, root)
+            ref_mat = world_mat(ref_skel, ref_hip)
 
-            if prev_mat.translation != hmat.translation:
-                print("moved")
+            if ref_mat == world_mat(act_skel, act_hip):
+                print("Frame %d: nothing to do" % f)
+                continue
 
-            if prev_mat.to_euler() != hmat.to_euler():
-                diff = hmat.to_euler().z - prev_mat.to_euler().z
-                print(diff)
-                rmat3 = rmat.to_3x3()
-                rmat3.rotate(mathutils.Euler((0, 0, diff)))
-
-                root.matrix = pose_mat(skel, root, rmat3.to_4x4())
-                context.scene.update()
-                hip.matrix = pose_mat(skel, hip, hmat)
-
-                root.keyframe_insert(data_path="rotation_quaternion")
-                hip.keyframe_insert(data_path="rotation_quaternion")
-
-            prev_mat = hmat
+            act_hip.matrix = pose_mat(act_skel, act_hip, ref_mat)
+            act_hip.keyframe_insert(data_path="rotation_quaternion")
+            act_hip.keyframe_insert(data_path="location")
 
         return {'FINISHED'}
 
 
 def active_armature(context):
-    for o in context.selected_objects:
-        if o.type == 'ARMATURE':
-            return o
+    if context.active_object.type == 'ARMATURE':
+        return context.active_object
+
+
+def reference_armature(context):
+    for obj in context.selected_objects:
+        if obj.type == 'ARMATURE' and obj != context.active_object:
+            return obj
 
 
 def world_mat(armature, bone):
