@@ -7,6 +7,7 @@ bl_info = {
 }
 
 import inspect
+import time
 
 import bpy
 import mathutils
@@ -15,6 +16,7 @@ import mathutils
 class RootMotionData(bpy.types.PropertyGroup):
     hip = bpy.props.StringProperty(name="Hip Bone")
     root = bpy.props.StringProperty(name="Root Bone")
+    copy = bpy.props.StringProperty(name="Debug Character")
 
 
 class CreateRootMotion(bpy.types.Operator):
@@ -23,45 +25,73 @@ class CreateRootMotion(bpy.types.Operator):
     bl_label = "Create Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
+    root = "root"
+    hip = "pelvis"
+    skel = None
+
     @classmethod
     def poll(cls, context):
         return active_armature(context) is not None
 
     def execute(self, context):
-        '''
-        act_skel = active_armature(context)
-        ref_skel = reference_armature(context)
-        if act_skel == None or ref_skel == None:
-            return {'CANCELLED'}
+        ref = self.debug_character(context)
+        context.scene.rm_data.copy = ref.name
 
-        act_hip = act_skel.pose.bones['pelvis']
-        ref_hip = ref_skel.pose.bones['pelvis']
-        if act_hip == None or ref_hip == None:
-            return {'CANCELLED'}
+        expr = "\"%s\"" % self.hip
+        curves = self.skel.animation_data.action.fcurves
+        for c in curves:
+            if expr in c.data_path:
+                curves.remove(c)
 
-        anim = act_skel.animation_data.action
-        ref_anim = ref_skel.animation_data.action
-        if anim == None or ref_anim == None:
-            return {'CANCELLED'}
-
-        bpy.ops.object.mode_set(mode='POSE')
-        for f in range(round(anim.frame_range.x), round(anim.frame_range.y) + 1):
+        hip = self.skel.pose.bones[self.hip]
+        ref_hip = ref.pose.bones[self.hip]
+        frames = self.skel.animation_data.action.frame_range
+        for f in range(round(frames.x), round(frames.y) + 1):
             context.scene.frame_set(f)
-            ref_mtx = world_mtx(ref_skel, ref_hip)
+            ref_mtx = world_mtx(ref, ref_hip)
 
-            if ref_mtx == world_mtx(act_skel, act_hip):
-                print("Frame %d: nothing to do" % f)
-                continue
-
-            act_hip.matrix = pose_mtx(act_skel, act_hip, ref_mtx)
-            act_hip.keyframe_insert(data_path="rotation_quaternion")
-            act_hip.keyframe_insert(data_path="location")
+            hip.matrix = pose_mtx(self.skel, hip, ref_mtx)
+            hip.keyframe_insert(data_path="rotation_quaternion")
+            hip.keyframe_insert(data_path="location")
+            hip.keyframe_insert(data_path="location")
 
         return {'FINISHED'}
-        '''
 
     def invoke(self, context, event):
-        return context.window_manager.invoke_props_dialog(self)
+        data = context.scene.rm_data
+
+        self.root = data.root if data.root != "" else self.root
+        self.hip = data.hip if data.hip != "" else self.hip
+        self.skel = active_armature(context)
+
+        if self.skel == None:
+            return {'CANCELLED'}
+        elif self.skel.animation_data.action == None:
+            return {'CANCELLED'}
+
+        return self.execute(context)
+
+    def debug_character(self, context):
+        char = self.skel.copy()
+        char.data = self.skel.data.copy()
+        char.animation_data.action = self.skel.animation_data.action.copy()
+        char.name = "skel" + str(int(time.time()))
+        context.scene.objects.link(char)
+
+        for c in self.skel.children:
+            mesh = c.copy()
+            mesh.data = c.data.copy()
+            mesh.parent = char
+            mesh.modifiers["Armature"].object = char
+            mesh.data.materials.append(bpy.data.materials["M_Dbg"])
+            context.scene.objects.link(mesh)
+
+        expr = "\"%s\"" % self.root
+        for fc in char.animation_data.action.fcurves:
+            if expr in fc.data_path:
+                fc.mute = True
+
+        return char
 
 
 class MainPanel(bpy.types.Panel):
@@ -73,7 +103,7 @@ class MainPanel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.active_object.type == 'ARMATURE'
+        return active_armature(context) is not None
 
     def draw(self, context):
         layout = self.layout
@@ -94,8 +124,9 @@ class MainPanel(bpy.types.Panel):
 
 
 def active_armature(context):
-    if context.active_object.type == 'ARMATURE':
-        return context.active_object
+    if context.active_object != None:
+        if context.active_object.type == 'ARMATURE':
+            return context.active_object
 
 
 def reference_armature(context):
