@@ -78,13 +78,17 @@ class CreateRootMotion(bpy.types.Operator):
         char.name = "skel" + str(int(time.time()))
         context.scene.objects.link(char)
 
-        for c in self.skel.children:
-            mesh = c.copy()
-            mesh.data = c.data.copy()
-            mesh.parent = char
-            mesh.modifiers["Armature"].object = char
-            mesh.data.materials.append(bpy.data.materials["M_Dbg"])
-            context.scene.objects.link(mesh)
+        if len(self.skel.children) != 0:
+            mat = bpy.data.materials.new(name="mat" + str(int(time.time())))
+            mat.diffuse_color = (0, 1, 0)
+
+            for c in self.skel.children:
+                mesh = c.copy()
+                mesh.data = c.data.copy()
+                mesh.parent = char
+                mesh.modifiers["Armature"].object = char
+                mesh.data.materials.append(mat)
+                context.scene.objects.link(mesh)
 
         expr = "\"%s\"" % self.root
         for fc in char.animation_data.action.fcurves:
