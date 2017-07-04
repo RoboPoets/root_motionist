@@ -84,24 +84,7 @@ class CreateRootMotion(bpy.types.Operator):
         if char != None:
             return char
 
-        char = self.skel.copy()
-        char.data = self.skel.data.copy()
-        char.animation_data.action = self.skel.animation_data.action.copy()
-        char.name = "skel" + str(int(time.time()))
-        context.scene.objects.link(char)
-
-        if len(self.skel.children) != 0:
-            mat = bpy.data.materials.new(name="mat" + str(int(time.time())))
-            mat.diffuse_color = (0, 1, 0)
-
-            for c in self.skel.children:
-                mesh = c.copy()
-                mesh.data = c.data.copy()
-                mesh.parent = char
-                mesh.modifiers["Armature"].object = char
-                mesh.data.materials.append(mat)
-                context.scene.objects.link(mesh)
-
+        char = debug_character(context, self.skel)
         expr = "\"%s\"" % self.root
         for fc in char.animation_data.action.fcurves:
             if expr in fc.data_path:
@@ -110,8 +93,87 @@ class CreateRootMotion(bpy.types.Operator):
         return char
 
 
+class RemoveRootMotion(bpy.types.Operator):
+    """Transfer root bone motion to hip bone"""
+    bl_idname = "anim.remove_rm"
+    bl_label = "Remove Root Motion"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    root = "root"
+    hip = "pelvis"
+    skel = None
+
+    ready = False
+
+    @classmethod
+    def poll(cls, context):
+        return active_armature(context) is not None
+
+    def modal(self, context, event):
+        frames = self.skel.animation_data.action.frame_range
+
+        if not self.ready:
+            context.scene.frame_set(frames.x)
+            self.ready = True
+            return {'RUNNING_MODAL'}
+
+        ref = self.debug_character(context)
+        context.scene.rm_data.copy = ref.name
+
+        root_expr = "\"%s\"" % self.root
+        hip_expr = "\"%s\"" % self.hip
+        curves = self.skel.animation_data.action.fcurves
+        for c in curves:
+            if root_expr in c.data_path or hip_expr in c.data_path:
+                curves.remove(c)
+
+        root = self.skel.pose.bones[self.root]
+        root.keyframe_insert(data_path="rotation_quaternion")
+        root.keyframe_insert(data_path="location")
+        root.keyframe_insert(data_path="scale")
+
+        hip = self.skel.pose.bones[self.hip]
+        ref_hip = ref.pose.bones[self.hip]
+        for f in range(round(frames.x), round(frames.y) + 1):
+            context.scene.frame_set(f)
+            ref_mtx = world_mtx(ref, ref_hip)
+
+            hip.matrix = pose_mtx(self.skel, hip, ref_mtx)
+            hip.keyframe_insert(data_path="rotation_quaternion")
+            hip.keyframe_insert(data_path="location")
+            hip.keyframe_insert(data_path="scale")
+
+        root.keyframe_insert(data_path="rotation_quaternion")
+        root.keyframe_insert(data_path="location")
+        root.keyframe_insert(data_path="scale")
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        data = context.scene.rm_data
+
+        self.root = data.root if data.root != "" else self.root
+        self.hip = data.hip if data.hip != "" else self.hip
+        self.skel = active_armature(context)
+
+        if self.skel == None:
+            return {'CANCELLED'}
+        elif self.skel.animation_data.action == None:
+            return {'CANCELLED'}
+
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def debug_character(self, context):
+        char = bpy.data.objects.get(context.scene.rm_data.copy)
+        if char != None:
+            return char
+
+        return debug_character(context, self.skel)
+
+
 class Cleanup(bpy.types.Operator):
-    """Remove temporary reference character and its properties"""
+    """Remove reference character and its properties"""
     bl_idname = "anim.cleanup_rm"
     bl_label = "Finalize Root Motion Operation"
     bl_options = {'REGISTER', 'UNDO'}
@@ -168,7 +230,7 @@ class MainPanel(bpy.types.Panel):
         col.label(text="Root Motion:")
         row = col.row(align=True)
         create_btn = row.operator("anim.create_rm", text="Create")
-        #delete_btn = row.operator("anim.create_rm", text="Remove")
+        delete_btn = row.operator("anim.remove_rm", text="Remove")
         col.operator("anim.cleanup_rm", text="Delete Ref Character")
 
 
@@ -192,9 +254,32 @@ def pose_mtx(armature, bone, mat):
     return armature.convert_space(bone, mat, from_space='WORLD', to_space='POSE')
 
 
+def debug_character(context, original):
+    char = original.copy()
+    char.data = original.data.copy()
+    char.animation_data.action = original.animation_data.action.copy()
+    char.name = "skel" + str(int(time.time()))
+    context.scene.objects.link(char)
+
+    if len(original.children) != 0:
+        mat = bpy.data.materials.new(name="mat" + str(int(time.time())))
+        mat.diffuse_color = (0, 1, 0)
+
+        for c in original.children:
+            mesh = c.copy()
+            mesh.data = c.data.copy()
+            mesh.parent = char
+            mesh.modifiers["Armature"].object = char
+            mesh.data.materials.append(mat)
+            context.scene.objects.link(mesh)
+
+    return char
+
+
 def register():
     bpy.utils.register_class(RootMotionData)
     bpy.utils.register_class(CreateRootMotion)
+    bpy.utils.register_class(RemoveRootMotion)
     bpy.utils.register_class(Cleanup)
     bpy.utils.register_class(MainPanel)
 
@@ -206,6 +291,7 @@ def unregister():
 
     bpy.utils.unregister_class(RootMotionData)
     bpy.utils.unregister_class(CreateRootMotion)
+    bpy.utils.unregister_class(RemoveRootMotion)
     bpy.utils.unregister_class(Cleanup)
     bpy.utils.unregister_class(MainPanel)
 
