@@ -175,7 +175,7 @@ class RemoveRootMotion(bpy.types.Operator):
 class ClearRootMotion(bpy.types.Operator):
     """Clear movement data from action, causing it to animate in-place"""
     bl_idname = "anim.clear_rm"
-    bl_label = "Animate In-Place"
+    bl_label = "Clear Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
     root = "root"
@@ -282,9 +282,11 @@ class MainPanel(bpy.types.Panel):
         col = layout.column(align=True)
         col.label(text="Root Motion:")
         row = col.row(align=True)
-        create_btn = row.operator("anim.create_rm", text="Create")
-        delete_btn = row.operator("anim.remove_rm", text="Remove")
-        col.operator("anim.cleanup_rm", text="Delete Ref Character")
+        row.operator("anim.create_rm", text="Create")
+        row.operator("anim.remove_rm", text="Remove")
+        col.operator("anim.clear_rm", text="Animate In-Place")
+
+        layout.operator("anim.cleanup_rm", text="Delete Ref Character")
 
 
 def active_armature(context):
