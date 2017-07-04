@@ -1,3 +1,11 @@
+#################################################################
+# Copyright (c) 2017 POET Industries
+#
+# This code is distributed under the MIT License. For a complete
+# list of terms see accompanying LICENSE file or the copy at
+# https://opensource.org/licenses/MIT
+#################################################################
+
 bl_info = {
     "name": "Root Motionist",
     "author": "POET Industries",
