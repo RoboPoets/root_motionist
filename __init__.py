@@ -29,11 +29,20 @@ class CreateRootMotion(bpy.types.Operator):
     hip = "pelvis"
     skel = None
 
+    ready = False
+
     @classmethod
     def poll(cls, context):
         return active_armature(context) is not None
 
-    def execute(self, context):
+    def modal(self, context, event):
+        frames = self.skel.animation_data.action.frame_range
+
+        if not self.ready:
+            context.scene.frame_set(frames.x)
+            self.ready = True
+            return {'RUNNING_MODAL'}
+
         ref = self.debug_character(context)
         context.scene.rm_data.copy = ref.name
 
@@ -45,7 +54,6 @@ class CreateRootMotion(bpy.types.Operator):
 
         hip = self.skel.pose.bones[self.hip]
         ref_hip = ref.pose.bones[self.hip]
-        frames = self.skel.animation_data.action.frame_range
         for f in range(round(frames.x), round(frames.y) + 1):
             context.scene.frame_set(f)
             ref_mtx = world_mtx(ref, ref_hip)
@@ -69,7 +77,8 @@ class CreateRootMotion(bpy.types.Operator):
         elif self.skel.animation_data.action == None:
             return {'CANCELLED'}
 
-        return self.execute(context)
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
 
     def debug_character(self, context):
         char = self.skel.copy()
