@@ -172,6 +172,59 @@ class RemoveRootMotion(bpy.types.Operator):
         return debug_character(context, self.skel)
 
 
+class ClearRootMotion(bpy.types.Operator):
+    """Clear movement data from action, causing it to animate in-place"""
+    bl_idname = "anim.clear_rm"
+    bl_label = "Animate In-Place"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    root = "root"
+    skel = None
+
+    ready = False
+
+    @classmethod
+    def poll(cls, context):
+        return active_armature(context) is not None
+
+    def modal(self, context, event):
+        frames = self.skel.animation_data.action.frame_range
+
+        if not self.ready:
+            context.scene.frame_set(frames.x)
+            self.ready = True
+            return {'RUNNING_MODAL'}
+
+        expr = "\"%s\"" % self.root
+        curves = self.skel.animation_data.action.fcurves
+        for c in curves:
+            if expr in c.data_path:
+                curves.remove(c)
+
+        root = self.skel.pose.bones[self.root]
+        for f in [round(frames.x), round(frames.y)]:
+            context.scene.frame_set(f)
+            root.keyframe_insert(data_path="rotation_quaternion")
+            root.keyframe_insert(data_path="location")
+            root.keyframe_insert(data_path="scale")
+
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        data = context.scene.rm_data
+
+        self.root = data.root if data.root != "" else self.root
+        self.skel = active_armature(context)
+
+        if self.skel == None:
+            return {'CANCELLED'}
+        elif self.skel.animation_data.action == None:
+            return {'CANCELLED'}
+
+        context.window_manager.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+
 class Cleanup(bpy.types.Operator):
     """Remove reference character and its properties"""
     bl_idname = "anim.cleanup_rm"
@@ -280,6 +333,7 @@ def register():
     bpy.utils.register_class(RootMotionData)
     bpy.utils.register_class(CreateRootMotion)
     bpy.utils.register_class(RemoveRootMotion)
+    bpy.utils.register_class(ClearRootMotion)
     bpy.utils.register_class(Cleanup)
     bpy.utils.register_class(MainPanel)
 
@@ -292,6 +346,7 @@ def unregister():
     bpy.utils.unregister_class(RootMotionData)
     bpy.utils.unregister_class(CreateRootMotion)
     bpy.utils.unregister_class(RemoveRootMotion)
+    bpy.utils.unregister_class(ClearRootMotion)
     bpy.utils.unregister_class(Cleanup)
     bpy.utils.unregister_class(MainPanel)
 
