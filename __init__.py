@@ -98,6 +98,38 @@ class CreateRootMotion(bpy.types.Operator):
         return char
 
 
+class Cleanup(bpy.types.Operator):
+    """Remove temporary reference character and its properties"""
+    bl_idname = "anim.cleanup_rm"
+    bl_label = "Finalize Root Motion Operation"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.rm_data.copy != ""
+
+    def execute(self, context):
+        char = bpy.data.objects.get(context.scene.rm_data.copy)
+        context.scene.rm_data.copy = ""
+        if char == None:
+            return {'CANCELLED'}
+
+        for c in char.children:
+            mat = c.data.materials[0]
+            if mat != None:
+                bpy.data.materials.remove(mat, True)
+            bpy.data.objects.remove(c, True)
+
+        anim = char.animation_data.action
+        if anim != None:
+            bpy.data.actions.remove(anim, True)
+
+        context.scene.objects.unlink(char)
+        bpy.data.objects.remove(char, True)
+
+        return {'FINISHED'}
+
+
 class MainPanel(bpy.types.Panel):
     bl_label = "Root Motionist"
     bl_space_type = 'VIEW_3D'
@@ -125,6 +157,7 @@ class MainPanel(bpy.types.Panel):
         row = col.row(align=True)
         create_btn = row.operator("anim.create_rm", text="Create")
         #delete_btn = row.operator("anim.create_rm", text="Remove")
+        col.operator("anim.cleanup_rm", text="Delete Ref Character")
 
 
 def active_armature(context):
@@ -150,6 +183,7 @@ def pose_mtx(armature, bone, mat):
 def register():
     bpy.utils.register_class(RootMotionData)
     bpy.utils.register_class(CreateRootMotion)
+    bpy.utils.register_class(Cleanup)
     bpy.utils.register_class(MainPanel)
 
     bpy.types.Scene.rm_data = bpy.props.PointerProperty(type=RootMotionData)
@@ -160,6 +194,7 @@ def unregister():
 
     bpy.utils.unregister_class(RootMotionData)
     bpy.utils.unregister_class(CreateRootMotion)
+    bpy.utils.unregister_class(Cleanup)
     bpy.utils.unregister_class(MainPanel)
 
 
