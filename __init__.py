@@ -53,7 +53,7 @@ class CreateRootMotion(bpy.types.Operator):
             hip.matrix = pose_mtx(self.skel, hip, ref_mtx)
             hip.keyframe_insert(data_path="rotation_quaternion")
             hip.keyframe_insert(data_path="location")
-            hip.keyframe_insert(data_path="location")
+            hip.keyframe_insert(data_path="scale")
 
         return {'FINISHED'}
 
