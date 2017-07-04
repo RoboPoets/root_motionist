@@ -6,7 +6,6 @@ bl_info = {
     "category": "Animation"
 }
 
-import inspect
 import time
 
 import bpy
@@ -81,6 +80,10 @@ class CreateRootMotion(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
     def debug_character(self, context):
+        char = bpy.data.objects.get(context.scene.rm_data.copy)
+        if char != None:
+            return char
+
         char = self.skel.copy()
         char.data = self.skel.data.copy()
         char.animation_data.action = self.skel.animation_data.action.copy()
