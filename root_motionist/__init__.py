@@ -1,5 +1,5 @@
 #################################################################
-# Copyright (c) 2017 POET Industries
+# Copyright (c) 2017-2018 POET Industries
 #
 # This code is distributed under the MIT License. For a complete
 # list of terms see accompanying LICENSE file or the copy at
@@ -266,6 +266,7 @@ class Cleanup(bpy.types.Operator):
 
 
 class MainPanel(bpy.types.Panel):
+    bl_idname = "OBJECT_PT_root_motionist_main"
     bl_label = "Root Motionist"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
