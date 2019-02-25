@@ -15,15 +15,22 @@ class CreateRootMotion(bpy.types.Operator):
     bl_label = "Create Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
-    root = "root"
-    hip = "pelvis"
+    root = ""
+    hip = ""
     skel = None
 
     ready = False
 
     @classmethod
     def poll(cls, context):
-        return active_armature(context) is not None
+        skel = active_armature(context)
+        if skel is None:
+            return False
+        if len(skel.pose.bones) < 2:
+            return False
+        if skel.animation_data.action == None:
+            return False
+        return True
 
     def modal(self, context, event):
         frames = self.skel.animation_data.action.frame_range
@@ -56,16 +63,14 @@ class CreateRootMotion(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        data = context.scene.rm_data
-
-        self.root = data.root if data.root != "" else self.root
-        self.hip = data.hip if data.hip != "" else self.hip
         self.skel = active_armature(context)
-
-        if self.skel == None:
-            return {'CANCELLED'}
-        elif self.skel.animation_data.action == None:
-            return {'CANCELLED'}
+        data = context.scene.rm_data
+        if data.root == "":
+            data.root = self.skel.pose.bones[0].name
+        if data.hip == "":
+            data.hip = self.skel.pose.bones[1].name
+        self.root = data.root
+        self.hip = data.hip
 
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
