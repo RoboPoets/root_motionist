@@ -211,10 +211,8 @@ class PANEL_PT_main_panel(bpy.types.Panel):
         obj = context.active_object
 
         col = layout.column(align=True)
-        col.prop_search(context.scene.rm_data, "root",
-                        obj.pose, "bones", text="Root")
-        col.prop_search(context.scene.rm_data, "hip",
-                        obj.pose, "bones", text="Hip")
+        col.prop_search(context.scene.rm_data, "root", obj.pose, "bones", text="Root")
+        col.prop_search(context.scene.rm_data, "hip", obj.pose, "bones", text="Hip")
         col.prop(obj.animation_data, "action", text="Anim")
 
         col = layout.column(align=True)
