@@ -7,6 +7,7 @@ class RootMotionData(bpy.types.PropertyGroup):
     hip = bpy.props.StringProperty(name="Hip Bone")
     root = bpy.props.StringProperty(name="Root Bone")
     copy = bpy.props.StringProperty(name="Debug Character")
+    step = bpy.props.IntProperty(name="Step Size", default=3, min=1)
 
 
 class ANIM_OT_extract_root_motion(bpy.types.Operator):
@@ -33,8 +34,7 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
 
         hip = self.skel.pose.bones[data.hip]
         ref_hip = ref.pose.bones[data.hip]
-        frames = self.skel.animation_data.action.frame_range
-        for f in range(round(frames.x), round(frames.y) + 1):
+        for f in steps(context, self.skel.animation_data.action.frame_range):
             context.scene.frame_set(f)
             ref_mtx = world_mtx(ref, ref_hip)
             hip.matrix = pose_mtx(self.skel, hip, ref_mtx)
@@ -96,8 +96,7 @@ class ANIM_OT_integrate_root_motion(bpy.types.Operator):
 
         hip = self.skel.pose.bones[data.hip]
         ref_hip = ref.pose.bones[data.hip]
-        frames = self.skel.animation_data.action.frame_range
-        for f in range(round(frames.x), round(frames.y) + 1):
+        for f in steps(context, self.skel.animation_data.action.frame_range):
             context.scene.frame_set(f)
             ref_mtx = world_mtx(ref, ref_hip)
 
@@ -215,6 +214,9 @@ class PANEL_PT_main_panel(bpy.types.Panel):
         col.prop_search(context.scene.rm_data, "hip", obj.pose, "bones", text="Hip")
         col.prop(obj.animation_data, "action", text="Anim")
 
+        row = layout.row()
+        row.prop(context.scene.rm_data, "step")
+
         col = layout.column(align=True)
         col.label(text="Root Motion:")
         row = col.row(align=True)
@@ -253,6 +255,14 @@ def debug_character(context, original):
     context.scene.rm_data.copy = char.name
     context.scene.objects.link(char)
     return char
+
+
+def steps(context, frames):
+    last = round(frames.y)
+    frms = list(range(round(frames.x), last + 1, context.scene.rm_data.step))
+    if frms[-1] != last:
+        frms.append(last)
+    return frms
 
 
 def register():
