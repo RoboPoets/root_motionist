@@ -9,9 +9,9 @@ class RootMotionData(bpy.types.PropertyGroup):
     copy = bpy.props.StringProperty(name="Debug Character")
 
 
-class CreateRootMotion(bpy.types.Operator):
+class ANIM_OT_extract_root_motion(bpy.types.Operator):
     """Transfer hip bone motion to root bone"""
-    bl_idname = "anim.create_rm"
+    bl_idname = "anim.rm_extract_root_motion"
     bl_label = "Create Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -89,10 +89,10 @@ class CreateRootMotion(bpy.types.Operator):
         return char
 
 
-class RemoveRootMotion(bpy.types.Operator):
+class ANIM_OT_integrate_root_motion(bpy.types.Operator):
     """Transfer root bone motion to hip bone"""
-    bl_idname = "anim.remove_rm"
-    bl_label = "Remove Root Motion"
+    bl_idname = "anim.rm_integrate_rm"
+    bl_label = "Integrate Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
     root = "root"
@@ -168,10 +168,10 @@ class RemoveRootMotion(bpy.types.Operator):
         return debug_character(context, self.skel)
 
 
-class ClearRootMotion(bpy.types.Operator):
-    """Clear movement data from action, causing it to animate in-place"""
-    bl_idname = "anim.clear_rm"
-    bl_label = "Clear Root Motion"
+class ANIM_OT_animate_in_place(bpy.types.Operator):
+    """Remove root motion from action, causing it to animate in-place"""
+    bl_idname = "anim.rm_anim_in_place"
+    bl_label = "Animate In Place"
     bl_options = {'REGISTER', 'UNDO'}
 
     root = "root"
@@ -221,9 +221,9 @@ class ClearRootMotion(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-class Cleanup(bpy.types.Operator):
+class ANIM_OT_remove_ref_character(bpy.types.Operator):
     """Remove reference character and its properties"""
-    bl_idname = "anim.cleanup_rm"
+    bl_idname = "anim.rm_remove_ref_char"
     bl_label = "Finalize Root Motion Operation"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -253,8 +253,8 @@ class Cleanup(bpy.types.Operator):
         return {'FINISHED'}
 
 
-class MainPanel(bpy.types.Panel):
-    bl_idname = "OBJECT_PT_root_motionist_main"
+class PANEL_PT_main_panel(bpy.types.Panel):
+    bl_idname = "PANEL_PT_root_motionist_main"
     bl_label = "Root Motionist"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
@@ -279,11 +279,11 @@ class MainPanel(bpy.types.Panel):
         col = layout.column(align=True)
         col.label(text="Root Motion:")
         row = col.row(align=True)
-        row.operator("anim.create_rm", text="Create")
-        row.operator("anim.remove_rm", text="Remove")
-        col.operator("anim.clear_rm", text="Animate In-Place")
+        row.operator("anim.rm_extract_root_motion", text="Extract")
+        row.operator("anim.rm_integrate_rm", text="Integrate")
+        col.operator("anim.rm_anim_in_place", text="Animate In-Place")
 
-        layout.operator("anim.cleanup_rm", text="Delete Ref Character")
+        layout.operator("anim.rm_remove_ref_char", text="Delete Ref Character")
 
 
 def active_armature(context):
@@ -311,11 +311,11 @@ def debug_character(context, original):
 
 def register():
     bpy.utils.register_class(RootMotionData)
-    bpy.utils.register_class(CreateRootMotion)
-    bpy.utils.register_class(RemoveRootMotion)
-    bpy.utils.register_class(ClearRootMotion)
-    bpy.utils.register_class(Cleanup)
-    bpy.utils.register_class(MainPanel)
+    bpy.utils.register_class(ANIM_OT_extract_root_motion)
+    bpy.utils.register_class(ANIM_OT_integrate_root_motion)
+    bpy.utils.register_class(ANIM_OT_animate_in_place)
+    bpy.utils.register_class(ANIM_OT_remove_ref_character)
+    bpy.utils.register_class(PANEL_PT_main_panel)
 
     bpy.types.Scene.rm_data = bpy.props.PointerProperty(type=RootMotionData)
 
@@ -324,8 +324,8 @@ def unregister():
     del bpy.types.Scene.rm_data
 
     bpy.utils.unregister_class(RootMotionData)
-    bpy.utils.unregister_class(CreateRootMotion)
-    bpy.utils.unregister_class(RemoveRootMotion)
-    bpy.utils.unregister_class(ClearRootMotion)
-    bpy.utils.unregister_class(Cleanup)
-    bpy.utils.unregister_class(MainPanel)
+    bpy.utils.unregister_class(ANIM_OT_extract_root_motion)
+    bpy.utils.unregister_class(ANIM_OT_integrate_root_motion)
+    bpy.utils.unregister_class(ANIM_OT_animate_in_place)
+    bpy.utils.unregister_class(ANIM_OT_remove_ref_character)
+    bpy.utils.unregister_class(PANEL_PT_main_panel)
