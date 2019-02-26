@@ -15,46 +15,28 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
     bl_label = "Create Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
-    root = ""
-    hip = ""
     skel = None
-
-    ready = False
 
     @classmethod
     def poll(cls, context):
-        skel = active_armature(context)
-        if skel is None:
-            return False
-        if len(skel.pose.bones) < 2:
-            return False
-        if skel.animation_data.action == None:
-            return False
-        return True
+        return valid_armature(context) is not None
 
     def modal(self, context, event):
-        frames = self.skel.animation_data.action.frame_range
-
-        if not self.ready:
-            context.scene.frame_set(frames.x)
-            self.ready = True
-            return {'RUNNING_MODAL'}
-
         ref = self.debug_character(context)
-        context.scene.rm_data.copy = ref.name
+        data = context.scene.rm_data
 
-        expr = "\"%s\"" % self.hip
+        expr = "\"%s\"" % data.hip
         curves = self.skel.animation_data.action.fcurves
         for c in curves:
             if expr in c.data_path:
                 curves.remove(c)
 
-        hip = self.skel.pose.bones[self.hip]
-        ref_hip = ref.pose.bones[self.hip]
+        hip = self.skel.pose.bones[data.hip]
+        ref_hip = ref.pose.bones[data.hip]
+        frames = self.skel.animation_data.action.frame_range
         for f in range(round(frames.x), round(frames.y) + 1):
             context.scene.frame_set(f)
             ref_mtx = world_mtx(ref, ref_hip)
-
             hip.matrix = pose_mtx(self.skel, hip, ref_mtx)
             hip.keyframe_insert(data_path="rotation_quaternion")
             hip.keyframe_insert(data_path="location")
@@ -63,29 +45,24 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        self.skel = active_armature(context)
+        self.skel = valid_armature(context)
+        context.scene.frame_set(self.skel.animation_data.action.frame_range.x)
+
         data = context.scene.rm_data
         if data.root == "":
             data.root = self.skel.pose.bones[0].name
         if data.hip == "":
             data.hip = self.skel.pose.bones[1].name
-        self.root = data.root
-        self.hip = data.hip
 
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
 
     def debug_character(self, context):
-        char = bpy.data.objects.get(context.scene.rm_data.copy)
-        if char != None:
-            return char
-
         char = debug_character(context, self.skel)
-        expr = "\"%s\"" % self.root
+        expr = "\"%s\"" % context.scene.rm_data.root
         for fc in char.animation_data.action.fcurves:
             if expr in fc.data_path:
                 fc.mute = True
-
         return char
 
 
@@ -95,41 +72,31 @@ class ANIM_OT_integrate_root_motion(bpy.types.Operator):
     bl_label = "Integrate Root Motion"
     bl_options = {'REGISTER', 'UNDO'}
 
-    root = "root"
-    hip = "pelvis"
     skel = None
-
-    ready = False
 
     @classmethod
     def poll(cls, context):
-        return active_armature(context) is not None
+        return valid_armature(context) is not None
 
     def modal(self, context, event):
-        frames = self.skel.animation_data.action.frame_range
+        ref = debug_character(context, self.skel)
+        data = context.scene.rm_data
 
-        if not self.ready:
-            context.scene.frame_set(frames.x)
-            self.ready = True
-            return {'RUNNING_MODAL'}
-
-        ref = self.debug_character(context)
-        context.scene.rm_data.copy = ref.name
-
-        root_expr = "\"%s\"" % self.root
-        hip_expr = "\"%s\"" % self.hip
+        root_expr = "\"%s\"" % data.root
+        hip_expr = "\"%s\"" % data.hip
         curves = self.skel.animation_data.action.fcurves
         for c in curves:
             if root_expr in c.data_path or hip_expr in c.data_path:
                 curves.remove(c)
 
-        root = self.skel.pose.bones[self.root]
+        root = self.skel.pose.bones[data.root]
         root.keyframe_insert(data_path="rotation_quaternion")
         root.keyframe_insert(data_path="location")
         root.keyframe_insert(data_path="scale")
 
-        hip = self.skel.pose.bones[self.hip]
-        ref_hip = ref.pose.bones[self.hip]
+        hip = self.skel.pose.bones[data.hip]
+        ref_hip = ref.pose.bones[data.hip]
+        frames = self.skel.animation_data.action.frame_range
         for f in range(round(frames.x), round(frames.y) + 1):
             context.scene.frame_set(f)
             ref_mtx = world_mtx(ref, ref_hip)
@@ -146,26 +113,17 @@ class ANIM_OT_integrate_root_motion(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        self.skel = valid_armature(context)
+        context.scene.frame_set(self.skel.animation_data.action.frame_range.x)
+
         data = context.scene.rm_data
-
-        self.root = data.root if data.root != "" else self.root
-        self.hip = data.hip if data.hip != "" else self.hip
-        self.skel = active_armature(context)
-
-        if self.skel == None:
-            return {'CANCELLED'}
-        elif self.skel.animation_data.action == None:
-            return {'CANCELLED'}
+        if data.root == "":
+            data.root = self.skel.pose.bones[0].name
+        if data.hip == "":
+            data.hip = self.skel.pose.bones[1].name
 
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
-
-    def debug_character(self, context):
-        char = bpy.data.objects.get(context.scene.rm_data.copy)
-        if char != None:
-            return char
-
-        return debug_character(context, self.skel)
 
 
 class ANIM_OT_animate_in_place(bpy.types.Operator):
@@ -174,30 +132,22 @@ class ANIM_OT_animate_in_place(bpy.types.Operator):
     bl_label = "Animate In Place"
     bl_options = {'REGISTER', 'UNDO'}
 
-    root = "root"
     skel = None
-
-    ready = False
 
     @classmethod
     def poll(cls, context):
-        return active_armature(context) is not None
+        return valid_armature(context) is not None
 
     def modal(self, context, event):
-        frames = self.skel.animation_data.action.frame_range
-
-        if not self.ready:
-            context.scene.frame_set(frames.x)
-            self.ready = True
-            return {'RUNNING_MODAL'}
-
-        expr = "\"%s\"" % self.root
+        data = context.scene.rm_data
+        expr = "\"%s\"" % data.root
         curves = self.skel.animation_data.action.fcurves
         for c in curves:
             if expr in c.data_path:
                 curves.remove(c)
 
-        root = self.skel.pose.bones[self.root]
+        root = self.skel.pose.bones[data.root]
+        frames = self.skel.animation_data.action.frame_range
         for f in [round(frames.x), round(frames.y)]:
             context.scene.frame_set(f)
             root.keyframe_insert(data_path="rotation_quaternion")
@@ -207,15 +157,12 @@ class ANIM_OT_animate_in_place(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
+        self.skel = valid_armature(context)
+        context.scene.frame_set(self.skel.animation_data.action.frame_range.x)
+
         data = context.scene.rm_data
-
-        self.root = data.root if data.root != "" else self.root
-        self.skel = active_armature(context)
-
-        if self.skel == None:
-            return {'CANCELLED'}
-        elif self.skel.animation_data.action == None:
-            return {'CANCELLED'}
+        if data.root == "":
+            data.root = self.skel.pose.bones[0].name
 
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
@@ -234,14 +181,8 @@ class ANIM_OT_remove_ref_character(bpy.types.Operator):
     def execute(self, context):
         char = bpy.data.objects.get(context.scene.rm_data.copy)
         context.scene.rm_data.copy = ""
-        if char == None:
+        if char is None:
             return {'CANCELLED'}
-
-        for c in char.children:
-            mat = c.data.materials[0]
-            if mat != None:
-                bpy.data.materials.remove(mat, True)
-            bpy.data.objects.remove(c, True)
 
         anim = char.animation_data.action
         if anim != None:
@@ -263,7 +204,7 @@ class PANEL_PT_main_panel(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return active_armature(context) is not None
+        return valid_armature(context) is not None
 
     def draw(self, context):
         layout = self.layout
@@ -286,10 +227,13 @@ class PANEL_PT_main_panel(bpy.types.Panel):
         layout.operator("anim.rm_remove_ref_char", text="Delete Ref Character")
 
 
-def active_armature(context):
-    if context.active_object != None:
-        if context.active_object.type == 'ARMATURE':
-            return context.active_object
+def valid_armature(context):
+    skel = context.active_object
+    if skel is not None and skel.type == 'ARMATURE':
+        if len(skel.pose.bones) >= 2:
+            if skel.animation_data.action is not None:
+                return skel
+    return None
 
 
 def world_mtx(armature, bone):
@@ -301,10 +245,14 @@ def pose_mtx(armature, bone, mat):
 
 
 def debug_character(context, original):
+    char = bpy.data.objects.get(context.scene.rm_data.copy)
+    if char is not None:
+        return char
     char = original.copy()
     char.data = original.data.copy()
     char.animation_data.action = original.animation_data.action.copy()
     char.name = "skel" + str(int(time.time()))
+    context.scene.rm_data.copy = char.name
     context.scene.objects.link(char)
     return char
 
