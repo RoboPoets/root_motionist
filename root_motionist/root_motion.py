@@ -23,8 +23,9 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
         return valid_armature(context) is not None
 
     def modal(self, context, event):
-        ref = self.debug_character(context)
+        ref = debug_character(context, self.skel)
         data = context.scene.rm_data
+        frames = self.skel.animation_data.action.frame_range
 
         expr = "\"%s\"" % data.hip
         curves = self.skel.animation_data.action.fcurves
@@ -32,12 +33,26 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
             if expr in c.data_path:
                 curves.remove(c)
 
-        hip = self.skel.pose.bones[data.hip]
+        root = self.skel.pose.bones[data.root]
         ref_hip = ref.pose.bones[data.hip]
-        for f in steps(context, self.skel.animation_data.action.frame_range):
+        ref_mtx = world_mtx(ref, ref_hip)
+        for f in steps(context, frames):
             context.scene.frame_set(f)
-            ref_mtx = world_mtx(ref, ref_hip)
-            hip.matrix = pose_mtx(self.skel, hip, ref_mtx)
+            mtx = world_mtx(ref, ref_hip)
+
+            mtx_trans = mathutils.Matrix.Translation(mtx.translation - ref_mtx.translation)
+            mtx_trans.translation.z = 0
+            mtx_rot = mathutils.Matrix.Rotation(0, 4, 'X')
+            mtx_scale = mathutils.Matrix.Scale(mtx.to_scale().x, 4)
+
+            root.matrix = pose_mtx(self.skel, root, mtx_trans * mtx_rot * mtx_scale)
+            root.keyframe_insert(data_path="location")
+            root.keyframe_insert(data_path="rotation_quaternion")
+
+        hip = self.skel.pose.bones[data.hip]
+        for f in range(round(frames.x), round(frames.y) + 1):
+            context.scene.frame_set(f)
+            hip.matrix = pose_mtx(self.skel, hip, world_mtx(ref, ref_hip))
             hip.keyframe_insert(data_path="rotation_quaternion")
             hip.keyframe_insert(data_path="location")
             hip.keyframe_insert(data_path="scale")
@@ -56,14 +71,6 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
 
         context.window_manager.modal_handler_add(self)
         return {'RUNNING_MODAL'}
-
-    def debug_character(self, context):
-        char = debug_character(context, self.skel)
-        expr = "\"%s\"" % context.scene.rm_data.root
-        for fc in char.animation_data.action.fcurves:
-            if expr in fc.data_path:
-                fc.mute = True
-        return char
 
 
 class ANIM_OT_integrate_root_motion(bpy.types.Operator):
