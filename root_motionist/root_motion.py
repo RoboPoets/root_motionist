@@ -35,17 +35,23 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
 
         root = self.skel.pose.bones[data.root]
         ref_hip = ref.pose.bones[data.hip]
+        ref_hip_vec = (ref_hip.head - ref_hip.tail)
+        ref_hip_vec.z = 0
         ref_mtx = world_mtx(ref, ref_hip)
         for f in steps(context, frames):
             context.scene.frame_set(f)
-            mtx = world_mtx(ref, ref_hip)
 
+            mtx = world_mtx(ref, ref_hip)
             mtx_trans = mathutils.Matrix.Translation(mtx.translation - ref_mtx.translation)
             mtx_trans.translation.z = 0
-            mtx_rot = mathutils.Matrix.Rotation(0, 4, 'X')
-            mtx_scale = mathutils.Matrix.Scale(mtx.to_scale().x, 4)
 
-            root.matrix = pose_mtx(self.skel, root, mtx_trans * mtx_rot * mtx_scale)
+            hip_vec = (ref_hip.head - ref_hip.tail)
+            hip_vec.z = 0
+
+            root.matrix = pose_mtx(self.skel, root, mtx_trans)
+            root.rotation_quaternion = ref_hip_vec.rotation_difference(hip_vec)
+            root.scale = (1, 1, 1)
+
             root.keyframe_insert(data_path="location")
             root.keyframe_insert(data_path="rotation_quaternion")
 
