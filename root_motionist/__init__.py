@@ -9,7 +9,7 @@
 bl_info = {
     "name": "Root Motionist",
     "author": "POET Industries",
-    "version": (0, 3, 0),
+    "version": (0, 4, 0),
     "blender": (2, 78, 0),
     "category": "Animation"
 }

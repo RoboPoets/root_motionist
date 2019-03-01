@@ -8,6 +8,12 @@ class RootMotionData(bpy.types.PropertyGroup):
     root = bpy.props.StringProperty(name="Root Bone")
     copy = bpy.props.StringProperty(name="Debug Character")
     step = bpy.props.IntProperty(name="Step Size", default=3, min=1)
+    no_rot = bpy.props.BoolProperty(name="Ignore Rotation")
+    do_vert = bpy.props.BoolProperty(name="Extract Vertical Motion")
+
+    # TODO maybe implement these someday
+    #bias_trans = bpy.props.FloatProperty(name="Translation Bias", default=0.1, min=0, soft_max=0.5)
+    #bias_rot = bpy.props.FloatProperty(name="Rotation Bias", default=0.7854, min=0, soft_max=3.14159, subtype='ANGLE')
 
 
 class ANIM_OT_extract_root_motion(bpy.types.Operator):
@@ -43,15 +49,16 @@ class ANIM_OT_extract_root_motion(bpy.types.Operator):
 
             mtx = world_mtx(ref, ref_hip)
             mtx_trans = mathutils.Matrix.Translation(mtx.translation - ref_mtx.translation)
-            mtx_trans.translation.z = 0
-
-            hip_vec = (ref_hip.head - ref_hip.tail)
-            hip_vec.z = 0
-
+            if not data.do_vert:
+                mtx_trans.translation.z = 0
             root.matrix = pose_mtx(self.skel, root, mtx_trans)
-            root.rotation_quaternion = ref_hip_vec.rotation_difference(hip_vec)
-            root.scale = (1, 1, 1)
 
+            if not data.no_rot:
+                hip_vec = (ref_hip.head - ref_hip.tail)
+                hip_vec.z = 0
+                root.rotation_quaternion = ref_hip_vec.rotation_difference(hip_vec)
+
+            root.scale = (1, 1, 1)
             root.keyframe_insert(data_path="location")
             root.keyframe_insert(data_path="rotation_quaternion")
 
@@ -227,11 +234,13 @@ class PANEL_PT_main_panel(bpy.types.Panel):
         col.prop_search(context.scene.rm_data, "hip", obj.pose, "bones", text="Hip")
         col.prop(obj.animation_data, "action", text="Anim")
 
-        row = layout.row()
-        row.prop(context.scene.rm_data, "step")
+        col = layout.column(align=True)
+        col.prop(context.scene.rm_data, "step")
+        col.prop(context.scene.rm_data, "no_rot")
+        col.prop(context.scene.rm_data, "do_vert")
+        layout.separator()
 
         col = layout.column(align=True)
-        col.label(text="Root Motion:")
         row = col.row(align=True)
         row.operator("anim.rm_extract_root_motion", text="Extract")
         row.operator("anim.rm_integrate_rm", text="Integrate")
